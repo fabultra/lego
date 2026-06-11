@@ -17,7 +17,9 @@
     },
     "android": {
       "package": "ca.sekoia.brickify",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -26,7 +28,8 @@
         {
           "cameraPermission": "Brickify photographie vos objets pour les transformer en modèles LEGO."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
