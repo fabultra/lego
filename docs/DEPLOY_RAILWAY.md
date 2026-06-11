@@ -34,8 +34,12 @@ AUTH_MODE=dev
 ```
 
 Notes :
-- `PUBLIC_BASE_URL` est inutile : l'API détecte `RAILWAY_PUBLIC_DOMAIN`
-  automatiquement (URLs des images/masques correctes dès le premier boot).
+- L'API détecte `RAILWAY_PUBLIC_DOMAIN` automatiquement, **mais** ce
+  variable n'existe qu'après la génération du domaine (étape 5) : si le
+  premier déploiement a démarré avant, les URLs de fichiers pointent sur
+  localhost. Deux options : redéployer après l'étape 5, ou (recommandé,
+  déterministe) ajouter explicitement
+  `PUBLIC_BASE_URL=https://<domaine>` une fois le domaine connu.
 - `PORT` est injecté par Railway — ne pas le définir.
 - ⚠️ `AUTH_MODE=dev` = **tous les clients partagent le même utilisateur**.
   Parfait pour tester depuis l'app mobile, à remplacer avant toute ouverture :
@@ -107,4 +111,5 @@ partageable). Pour scaler :
 | `ECONNREFUSED 6379` en boucle | `REDIS_URL` absent ou référence `${{Redis.REDIS_URL}}` non résolue |
 | Migrations en échec au boot | `DATABASE_URL` manquant, ou base pas encore provisionnée — redéployer |
 | Images 404 après redéploiement | volume non attaché ou `STORAGE_LOCAL_DIR` ≠ chemin monté |
+| URLs d'images en `http://localhost:8080/...` | service démarré avant la création du domaine — définir `PUBLIC_BASE_URL` puis redéployer |
 | L'app mobile ne voit pas l'API | `EXPO_PUBLIC_API_URL` manquant (relancer `expo start` après changement) |
