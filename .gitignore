@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnp.*
+
+# Builds
+dist/
+build/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Expo
+.expo/
+.expo-shared/
+apps/mobile/web-build/
+
+# Prisma
+apps/api/prisma/migrations/dev/
+
+# Storage local (dev)
+storage/
+*.out.json
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.log
