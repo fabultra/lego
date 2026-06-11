@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Brickify AI",
+    "slug": "brickify-ai",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "brickify",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ca.sekoia.brickify",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Brickify photographie vos objets pour les transformer en modèles LEGO.",
+        "NSPhotoLibraryUsageDescription": "Brickify utilise vos photos pour générer des modèles LEGO."
+      }
+    },
+    "android": {
+      "package": "ca.sekoia.brickify",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Brickify photographie vos objets pour les transformer en modèles LEGO."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "brickify-ai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Brickify AI — transforme une photo d'objet réel en modèle LEGO constructible",
+  "workspaces": [
+    "packages/*",
+    "apps/api"
+  ],
+  "scripts": {
+    "demo:engine": "node --import tsx packages/engine/src/demo/run.ts",
+    "test": "node --import tsx --test packages/engine/test/*.test.ts",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/engine && tsc -p apps/api --noEmit",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:worker": "npm run worker -w apps/api",
+    "dev:mobile": "cd apps/mobile && npm run start",
+    "db:up": "docker compose up -d",
+    "db:migrate": "npm run prisma:migrate -w apps/api",
+    "db:seed": "npm run prisma:seed -w apps/api"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.21",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

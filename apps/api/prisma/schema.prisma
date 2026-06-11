@@ -1,0 +1,208 @@
+// Brickify AI — schéma de données.
+// Conventions : enums en SCREAMING_CASE côté DB, sérialisés en minuscules
+// dans les DTOs (voir src/serializers.ts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  DRAFT
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum ModelSize {
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum DetailLevel {
+  SIMPLE
+  BALANCED
+  DETAILED
+}
+
+enum StyleKind {
+  REALISTIC
+  CARTOON
+  PIXEL_ART
+  BLOCKY
+}
+
+enum ImageKind {
+  SOURCE
+  MASK_AUTO
+  MASK_EDITED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  projects  Project[]
+  inventory UserInventory?
+}
+
+model Project {
+  id        String        @id @default(uuid())
+  userId    String
+  name      String
+  status    ProjectStatus @default(DRAFT)
+  /// 0..100 pendant la génération
+  progress  Int           @default(0)
+  /// étape du pipeline en cours (clé PipelineStage)
+  stage     String?
+  error     String?
+  size      ModelSize     @default(MEDIUM)
+  detail    DetailLevel   @default(BALANCED)
+  style     StyleKind     @default(REALISTIC)
+  /// profondeur forcée en tenons (optionnel)
+  depthStuds Int?
+  /// id du job BullMQ en cours
+  jobId     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images UploadedImage[]
+  model  GeneratedModel?
+
+  @@index([userId, createdAt])
+}
+
+model UploadedImage {
+  id         String    @id @default(uuid())
+  projectId  String
+  kind       ImageKind
+  storageKey String
+  width      Int
+  height     Int
+  mime       String
+  createdAt  DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, kind])
+}
+
+model GeneratedModel {
+  id             String   @id @default(uuid())
+  projectId      String   @unique
+  sizeX          Int
+  sizeY          Int
+  sizeZ          Int
+  voxelCount     Int
+  pieceCount     Int
+  colorCount     Int
+  stepCount      Int
+  /// nombre de couches de base ajoutées (plaques)
+  baseLayers     Int      @default(0)
+  stabilityScore Float
+  /// StructuralIssueDTO[]
+  issues         Json
+  /// palette du modèle : LegoColorDTO[] (sous-ensemble ordonné)
+  palette        Json
+  /// stats moteur (PipelineStats)
+  stats          Json
+  /// clé storage du JSON de grille voxel (rendu client / debug)
+  gridKey        String?
+  createdAt      DateTime @default(now())
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pieces  ModelPiece[]
+  steps   BuildStep[]
+}
+
+/// Catalogue des pièces autorisées (seedé depuis @brickify/engine).
+model LegoPiece {
+  id            String @id // design id, ex. "3001"
+  name          String
+  widthStuds    Int
+  depthStuds    Int
+  heightPlates  Int
+  kind          String // brick | plate | slope
+  avgPriceCents Int
+
+  modelPieces     ModelPiece[]
+  inventoryPieces InventoryPiece[]
+}
+
+/// Couleurs LEGO (ids BrickLink, seedées depuis @brickify/engine).
+model LegoColor {
+  id   Int    @id
+  name String
+  hex  String
+
+  modelPieces     ModelPiece[]
+  inventoryPieces InventoryPiece[]
+}
+
+/// Une brique placée dans un modèle généré.
+model ModelPiece {
+  id        String  @id @default(uuid())
+  modelId   String
+  /// id de brique côté moteur ("b42") — référencé par BuildStep.brickIds
+  bid       String
+  pieceId   String
+  colorId   Int
+  x         Int
+  y         Int
+  z         Int
+  rotated   Boolean
+  stepIndex Int
+
+  model GeneratedModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  piece LegoPiece      @relation(fields: [pieceId], references: [id])
+  color LegoColor      @relation(fields: [colorId], references: [id])
+
+  @@unique([modelId, bid])
+  @@index([modelId, z])
+  @@index([modelId, stepIndex])
+}
+
+model BuildStep {
+  id      String  @id @default(uuid())
+  modelId String
+  index   Int
+  layer   Int
+  note    String?
+  /// résumé des pièces à prendre : { partId, colorId, quantity }[]
+  pieces  Json
+
+  model GeneratedModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@unique([modelId, index])
+}
+
+model UserInventory {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  updatedAt DateTime @updatedAt
+
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items InventoryPiece[]
+}
+
+model InventoryPiece {
+  id          String @id @default(uuid())
+  inventoryId String
+  pieceId     String
+  colorId     Int
+  quantity    Int
+
+  inventory UserInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  piece     LegoPiece     @relation(fields: [pieceId], references: [id])
+  color     LegoColor     @relation(fields: [colorId], references: [id])
+
+  @@unique([inventoryId, pieceId, colorId])
+}
