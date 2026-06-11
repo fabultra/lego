@@ -6,6 +6,7 @@ pièces manquantes et **instructions de montage couche par couche**.
 
 - Architecture, faisabilité, risques, roadmap : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Pipeline algorithmique détaillé (photo → voxels → briques) : [docs/PIPELINE.md](docs/PIPELINE.md)
+- Déploiement Railway (mono-service + Postgres + Redis + volume) : [docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md)
 
 ## Structure
 
