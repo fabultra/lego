@@ -25,7 +25,9 @@ console.log(`[worker] en écoute sur la file "${QUEUE_NAME}"`);
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, async () => {
-    await worker.close();
+    // Fermeture bornée : ne jamais bloquer un arrêt (redéploiement) si Redis
+    // est injoignable.
+    await Promise.race([worker.close(), new Promise((r) => setTimeout(r, 5000))]);
     process.exit(0);
   });
 }

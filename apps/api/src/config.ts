@@ -6,13 +6,28 @@ function env(name: string, fallback?: string): string {
   return v;
 }
 
+/**
+ * URL publique par défaut : sur Railway, RAILWAY_PUBLIC_DOMAIN est injecté
+ * automatiquement — aucun réglage manuel de PUBLIC_BASE_URL nécessaire.
+ */
+const defaultPublicBaseUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : `http://localhost:${env('PORT', '3000')}`;
+
 export const config = {
   port: parseInt(env('PORT', '3000'), 10),
   nodeEnv: env('NODE_ENV', 'development'),
   databaseUrl: env('DATABASE_URL', 'postgresql://brickify:brickify@localhost:5432/brickify'),
   redisUrl: env('REDIS_URL', 'redis://localhost:6379'),
   /** URL publique de l'API (pour construire les URLs de fichiers en mode local). */
-  publicBaseUrl: env('PUBLIC_BASE_URL', `http://localhost:${env('PORT', '3000')}`),
+  publicBaseUrl: env('PUBLIC_BASE_URL', defaultPublicBaseUrl),
+  /**
+   * EMBED_WORKER=true : démarre le worker BullMQ dans le même processus que
+   * l'API. Pratique pour un déploiement mono-service (Railway MVP) où le
+   * stockage local sur volume doit être partagé entre API et worker.
+   * En scale-out : remettre à false et lancer un service worker dédié.
+   */
+  embedWorker: env('EMBED_WORKER', 'false') === 'true',
   storage: {
     driver: env('STORAGE_DRIVER', 'local') as 'local' | 's3',
     localDir: env('STORAGE_LOCAL_DIR', './storage'),
