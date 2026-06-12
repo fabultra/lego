@@ -39,11 +39,14 @@ export async function processGeneration(
     const sourceBuffer = await storage.get(source.storageKey);
     const { raster } = await decodeUpload(sourceBuffer);
 
-    // Masque corrigé par l'utilisateur, s'il existe.
+    // Réutilise le masque de l'écran de confirmation (corrigé > automatique) :
+    // cohérence aperçu/génération garantie, et pas de double appel ML.
     let precomputedMask: Mask | undefined;
-    const edited = project.images.find((i) => i.kind === 'MASK_EDITED');
-    if (edited) {
-      precomputedMask = await pngToMask(await storage.get(edited.storageKey));
+    const maskImage =
+      project.images.find((i) => i.kind === 'MASK_EDITED') ??
+      project.images.find((i) => i.kind === 'MASK_AUTO');
+    if (maskImage) {
+      precomputedMask = await pngToMask(await storage.get(maskImage.storageKey));
     }
 
     const options: PipelineOptions = {
