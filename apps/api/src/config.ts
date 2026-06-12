@@ -52,6 +52,9 @@ export const config = {
     token: process.env.REPLICATE_API_TOKEN,
     segmentModel: env('REPLICATE_SEGMENT_MODEL', '851-labs/background-remover'),
     timeoutMs: parseInt(env('REPLICATE_TIMEOUT_MS', '45000'), 10),
+    depthModel: env('REPLICATE_DEPTH_MODEL', 'chenxwh/depth-anything-v2'),
+    /** Le relief est un bonus : timeout plus large (cold start GPU) mais jamais bloquant. */
+    depthTimeoutMs: parseInt(env('REPLICATE_DEPTH_TIMEOUT_MS', '90000'), 10),
   },
   limits: {
     maxUploadBytes: 12 * 1024 * 1024,

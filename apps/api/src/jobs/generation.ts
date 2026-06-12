@@ -1,6 +1,7 @@
 import { EngineError, runPipeline, type Mask, type PipelineOptions } from '@brickify/engine';
 import { prisma } from '../db';
 import { decodeUpload, pngToMask } from '../images';
+import { getDepthImage } from '../ml/depth';
 import { toDtoDetail, toDtoSize, toDtoStyle } from '../serializers';
 import { storage, storageKeys } from '../storage';
 
@@ -49,12 +50,25 @@ export async function processGeneration(
       precomputedMask = await pngToMask(await storage.get(maskImage.storageKey));
     }
 
+    // Relief réel (profondeur monoculaire) pour les styles volumiques —
+    // jamais bloquant : sans réponse ML, profil elliptique du moteur.
+    const style = toDtoStyle(project.style);
+    let depthImage: PipelineOptions['depthImage'];
+    if (style === 'realistic' || style === 'cartoon') {
+      depthImage = (await getDepthImage(sourceBuffer, raster.width, raster.height)) ?? undefined;
+      if (depthImage) {
+        await reportProgress('depth', 22);
+        console.log('[worker] relief ML appliqué (depth-anything-v2)');
+      }
+    }
+
     const options: PipelineOptions = {
       size: toDtoSize(project.size),
       detail: toDtoDetail(project.detail),
-      style: toDtoStyle(project.style),
+      style,
       depthStuds: project.depthStuds ?? undefined,
       precomputedMask,
+      depthImage,
     };
 
     const result = await runPipeline(raster, options, (stage, pct) => {

@@ -31,6 +31,13 @@ export interface Mask {
   data: Uint8Array;
 }
 
+/** Image en niveaux de gris (carte de profondeur : 255 = proche). */
+export interface GrayImage {
+  width: number;
+  height: number;
+  data: Uint8Array;
+}
+
 /**
  * Silhouette échantillonnée sur la grille LEGO (plan x/z).
  * `occupancy[z * sx + x] = 1` si la cellule appartient à l'objet.
@@ -42,6 +49,11 @@ export interface Silhouette {
   sz: number;
   occupancy: Uint8Array;
   colors: Uint8ClampedArray;
+  /**
+   * Profondeur moyenne par cellule (0..255, 255 = proche caméra), présente
+   * quand une carte de profondeur ML a été fournie au pipeline.
+   */
+  depth?: Float32Array;
 }
 
 /**
@@ -148,6 +160,12 @@ export interface PipelineOptions {
   addBase?: 'auto' | 'always' | 'never';
   /** Masque pré-calculé (ex. corrigé par l'utilisateur) — court-circuite la segmentation. */
   precomputedMask?: Mask;
+  /**
+   * Carte de profondeur monoculaire alignée sur la photo (255 = proche).
+   * Quand présente (styles realistic/cartoon), l'épaisseur suit le relief
+   * réel au lieu du profil elliptique déduit de la silhouette.
+   */
+  depthImage?: GrayImage;
 }
 
 /** Paramètres résolus (taille/détail/style -> valeurs concrètes). */

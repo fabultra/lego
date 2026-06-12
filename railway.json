@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npm run start:railway -w apps/api",
+    "startCommand": "cd apps/api && npx prisma migrate deploy && node --import tsx prisma/seed.ts && exec node --import tsx src/index.ts",
     "healthcheckPath": "/healthz",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
