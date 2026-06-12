@@ -53,8 +53,13 @@ export const config = {
     segmentModel: env('REPLICATE_SEGMENT_MODEL', '851-labs/background-remover'),
     timeoutMs: parseInt(env('REPLICATE_TIMEOUT_MS', '45000'), 10),
     depthModel: env('REPLICATE_DEPTH_MODEL', 'chenxwh/depth-anything-v2'),
-    /** Le relief est un bonus : timeout plus large (cold start GPU) mais jamais bloquant. */
-    depthTimeoutMs: parseInt(env('REPLICATE_DEPTH_TIMEOUT_MS', '90000'), 10),
+    /**
+     * Le relief est un bonus : timeout court — un modèle froid (cold start
+     * GPU de plusieurs minutes chez Replicate) ne doit pas retarder la
+     * génération, on retombe sur le profil elliptique. Un modèle chaud
+     * répond en quelques secondes.
+     */
+    depthTimeoutMs: parseInt(env('REPLICATE_DEPTH_TIMEOUT_MS', '25000'), 10),
   },
   limits: {
     maxUploadBytes: 12 * 1024 * 1024,
