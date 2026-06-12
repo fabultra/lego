@@ -67,8 +67,13 @@ export interface VoxelGrid {
 }
 
 export interface LegoColor {
-  /** Id couleur BrickLink (utilisé pour les exports). */
+  /**
+   * Id couleur canonique Rebrickable (compatible LDraw pour les couleurs
+   * standards) — utilisé partout en interne et pour l'export Studio/LDraw.
+   */
   id: number;
+  /** Id couleur BrickLink (export Wanted List). */
+  blId: number;
   name: string;
   hex: string;
   rgb: [number, number, number];

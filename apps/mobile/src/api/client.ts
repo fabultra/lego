@@ -99,6 +99,16 @@ export const api = {
     return request(`/projects/${projectId}/instructions`);
   },
 
+  getInventory(): Promise<import('../types').InventoryDTO> {
+    return request('/inventory');
+  },
+
+  addSetToInventory(
+    setNum: string,
+  ): Promise<{ setNum: string; setName: string; year: number; partLines: number; totalQuantity: number }> {
+    return request('/inventory/sets', { method: 'POST', body: JSON.stringify({ setNum }) });
+  },
+
   /** Retourne le contenu texte de l'export (XML BrickLink ou LDraw). */
   async exportFile(kind: 'bricklink' | 'studio', projectId: string, onlyMissing = false): Promise<string> {
     const res = await fetch(`${BASE_URL}/exports/${kind}`, {

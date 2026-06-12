@@ -108,6 +108,67 @@ inventoryRouter.post(
   }),
 );
 
+const addSetSchema = z.object({
+  /** Numéro de set, ex. "10696" ou "10696-1". */
+  setNum: z.string().min(2).max(20),
+});
+
+// --- POST /inventory/sets -------------------------------------------------------
+// "J'ai cette boîte" : importe le contenu réel d'un set (catalogue
+// Rebrickable) dans l'inventaire de l'utilisateur.
+inventoryRouter.post(
+  '/sets',
+  asyncHandler<AuthedRequest>(async (req, res) => {
+    const { setNum } = addSetSchema.parse(req.body);
+    // Rebrickable suffixe les sets d'une version : "10696" -> "10696-1".
+    const candidates = setNum.includes('-') ? [setNum] : [`${setNum}-1`, setNum];
+    const set = await prisma.rbSet.findFirst({ where: { setNum: { in: candidates } } });
+    if (!set) {
+      throw ApiError.notFound(
+        `Set "${setNum}" (catalogue non importé ? Lancer POST /admin/import-rebrickable)`,
+      );
+    }
+    const parts = await prisma.rbSetPart.findMany({ where: { setNum: set.setNum } });
+    if (parts.length === 0) {
+      throw ApiError.notFound(`Inventaire du set ${set.setNum}`);
+    }
+
+    const inv = await prisma.userInventory.upsert({
+      where: { userId: req.userId },
+      create: { userId: req.userId },
+      update: {},
+    });
+    await prisma.$transaction(
+      parts.map((p) =>
+        prisma.inventoryPiece.upsert({
+          where: {
+            inventoryId_pieceId_colorId: {
+              inventoryId: inv.id,
+              pieceId: p.partId,
+              colorId: p.colorId,
+            },
+          },
+          create: {
+            inventoryId: inv.id,
+            pieceId: p.partId,
+            colorId: p.colorId,
+            quantity: p.quantity,
+          },
+          update: { quantity: { increment: p.quantity } },
+        }),
+      ),
+    );
+
+    res.status(201).json({
+      setNum: set.setNum,
+      setName: set.name,
+      year: set.year,
+      partLines: parts.length,
+      totalQuantity: parts.reduce((s, p) => s + p.quantity, 0),
+    });
+  }),
+);
+
 // --- POST /inventory/scan ------------------------------------------------------
 // V2 : détection des pièces en vrac par vision (voir docs/PIPELINE.md §8).
 inventoryRouter.post(

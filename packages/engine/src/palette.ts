@@ -2,46 +2,48 @@ import type { LegoColor } from './types';
 
 /**
  * Palette LEGO réduite : couleurs opaques courantes, faciles à sourcer.
- * Les ids sont les ids couleur BrickLink (utilisés par l'export Wanted List).
  *
- * NOTE PROD : vérifier les ids contre le catalogue BrickLink officiel avant
- * d'activer l'export en production (source de vérité : catalogue colorList).
+ * `id` = id Rebrickable (canonique, égal au code LDraw pour ces couleurs
+ * standards — vérifié contre colors.csv de Rebrickable, hex inclus).
+ * `blId` = id couleur BrickLink (export Wanted List).
+ * Le job d'import Rebrickable (apps/api) audite automatiquement noms et hex
+ * contre le catalogue officiel à chaque import.
  */
-function c(id: number, name: string, hex: string): LegoColor {
+function c(id: number, blId: number, name: string, hex: string): LegoColor {
   const rgb: [number, number, number] = [
     parseInt(hex.slice(1, 3), 16),
     parseInt(hex.slice(3, 5), 16),
     parseInt(hex.slice(5, 7), 16),
   ];
-  return { id, name, hex, rgb };
+  return { id, blId, name, hex, rgb };
 }
 
 export const LEGO_PALETTE: LegoColor[] = [
-  c(1, 'White', '#F4F4F4'),
-  c(86, 'Light Bluish Gray', '#A0A5A9'),
-  c(85, 'Dark Bluish Gray', '#6C6E68'),
-  c(11, 'Black', '#1B2A34'),
-  c(5, 'Red', '#C91A09'),
-  c(59, 'Dark Red', '#720E0F'),
-  c(4, 'Orange', '#FE8A18'),
-  c(110, 'Bright Light Orange', '#F8BB3D'),
-  c(3, 'Yellow', '#F2CD37'),
-  c(103, 'Bright Light Yellow', '#FFF03A'),
-  c(34, 'Lime', '#BBE90B'),
-  c(36, 'Bright Green', '#4B9F4A'),
-  c(6, 'Green', '#237841'),
-  c(80, 'Dark Green', '#184632'),
-  c(156, 'Medium Azure', '#36AEBF'),
-  c(42, 'Medium Blue', '#5A93DB'),
-  c(7, 'Blue', '#0055BF'),
-  c(63, 'Dark Blue', '#0A3463'),
-  c(24, 'Purple', '#81007B'),
-  c(47, 'Dark Pink', '#C870A0'),
-  c(104, 'Bright Pink', '#E4ADC8'),
-  c(2, 'Tan', '#E4CD9E'),
-  c(69, 'Dark Tan', '#958A73'),
-  c(88, 'Reddish Brown', '#582A12'),
-  c(120, 'Dark Brown', '#352100'),
+  c(15, 1, 'White', '#F4F4F4'),
+  c(71, 86, 'Light Bluish Gray', '#A0A5A9'),
+  c(72, 85, 'Dark Bluish Gray', '#6C6E68'),
+  c(0, 11, 'Black', '#1B2A34'),
+  c(4, 5, 'Red', '#C91A09'),
+  c(320, 59, 'Dark Red', '#720E0F'),
+  c(25, 4, 'Orange', '#FE8A18'),
+  c(191, 110, 'Bright Light Orange', '#F8BB3D'),
+  c(14, 3, 'Yellow', '#F2CD37'),
+  c(226, 103, 'Bright Light Yellow', '#FFF03A'),
+  c(27, 34, 'Lime', '#BBE90B'),
+  c(10, 36, 'Bright Green', '#4B9F4A'),
+  c(2, 6, 'Green', '#237841'),
+  c(288, 80, 'Dark Green', '#184632'),
+  c(322, 156, 'Medium Azure', '#36AEBF'),
+  c(73, 42, 'Medium Blue', '#5A93DB'),
+  c(1, 7, 'Blue', '#0055BF'),
+  c(272, 63, 'Dark Blue', '#0A3463'),
+  c(22, 24, 'Purple', '#81007B'),
+  c(5, 47, 'Dark Pink', '#C870A0'),
+  c(29, 104, 'Bright Pink', '#E4ADC8'),
+  c(19, 2, 'Tan', '#E4CD9E'),
+  c(28, 69, 'Dark Tan', '#958A73'),
+  c(70, 88, 'Reddish Brown', '#582A12'),
+  c(308, 120, 'Dark Brown', '#352100'),
 ];
 
 // ---------------------------------------------------------------------------

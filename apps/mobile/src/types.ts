@@ -158,3 +158,14 @@ export interface InstructionsDTO {
   layerCount: number;
   steps: BuildStepDTO[];
 }
+
+export interface InventoryLineDTO {
+  partId: string;
+  colorId: number;
+  quantity: number;
+}
+
+export interface InventoryDTO {
+  items: (InventoryLineDTO & { partName: string; colorName: string })[];
+  totalPieces: number;
+}

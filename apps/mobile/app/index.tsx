@@ -25,12 +25,20 @@ export default function HomeScreen() {
           <Text className="text-white text-xl font-bold">📷  Photographier un objet</Text>
         </Pressable>
 
-        <Pressable
-          onPress={() => router.push('/projects')}
-          className="mt-4 bg-white border border-gray-200 rounded-2xl py-4 items-center active:opacity-90"
-        >
-          <Text className="text-brick-dark text-base font-semibold">Mes projets</Text>
-        </Pressable>
+        <View className="flex-row gap-3 mt-4">
+          <Pressable
+            onPress={() => router.push('/projects')}
+            className="flex-1 bg-white border border-gray-200 rounded-2xl py-4 items-center active:opacity-90"
+          >
+            <Text className="text-brick-dark text-base font-semibold">Mes projets</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/inventory')}
+            className="flex-1 bg-white border border-gray-200 rounded-2xl py-4 items-center active:opacity-90"
+          >
+            <Text className="text-brick-dark text-base font-semibold">Mes briques</Text>
+          </Pressable>
+        </View>
 
         <View className="mt-12 gap-4">
           {[
