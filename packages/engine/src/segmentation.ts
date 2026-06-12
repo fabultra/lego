@@ -2,12 +2,15 @@ import type { Mask, RasterImage } from './types';
 
 /**
  * Segmentation MVP, 100% TypeScript, sans modèle ML :
- *  1. estimer la couleur de fond depuis la bordure de l'image (k-means k<=2) ;
- *  2. carte de distance couleur au fond ;
- *  3. seuillage automatique (Otsu) ;
- *  4. remplissage de fond depuis les bords (les trous internes deviennent objet) ;
- *  5. nettoyage morphologique (open puis close) ;
- *  6. conservation de la composante principale.
+ *  1. flou léger (anti-texture : tapis, tissus, grain) pour le modèle de fond ;
+ *  2. estimer la couleur de fond depuis la bordure de l'image (k-means k<=2) ;
+ *  3. carte de distance couleur au fond ;
+ *  4. seuillage automatique (Otsu) avec hystérésis ;
+ *  5. remplissage de fond depuis les bords (les trous internes deviennent objet) ;
+ *  6. nettoyage morphologique (open puis close) ;
+ *  7. sélection du SUJET : composante la plus plausible (taille pondérée par
+ *     la proximité du centre, pénalité si elle touche la bordure) — et non
+ *     simplement la plus grosse, sinon une zone de fond contrastée gagne.
  *
  * Hypothèse assumée : fond raisonnablement uni et contrasté (l'UX guide la
  * prise de vue). Pour les fonds complexes, brancher un `Segmenter` ML
@@ -153,25 +156,101 @@ function dilate(mask: Uint8Array, w: number, h: number): Uint8Array {
   return out;
 }
 
-/** Garde la plus grande composante 4-connexe du masque. */
-function keepLargestComponent(mask: Uint8Array, w: number, h: number): Uint8Array {
+/** Flou boîte séparable (2 passes ~ gaussien) — utilisé pour la carte de distance. */
+export function boxBlurRgb(img: RasterImage, radius: number): RasterImage {
+  if (radius <= 0) return img;
+  const { width: w, height: h } = img;
+  const tmp = new Float32Array(w * h * 3);
+  const out = new Uint8ClampedArray(w * h * 4);
+  const norm = 2 * radius + 1;
+  // passe horizontale
+  for (let y = 0; y < h; y++) {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let x = -radius; x <= radius; x++) {
+      const cx = Math.max(0, Math.min(w - 1, x));
+      const i = (y * w + cx) * 4;
+      r += img.data[i];
+      g += img.data[i + 1];
+      b += img.data[i + 2];
+    }
+    for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 3;
+      tmp[o] = r / norm;
+      tmp[o + 1] = g / norm;
+      tmp[o + 2] = b / norm;
+      const xAdd = Math.min(w - 1, x + radius + 1);
+      const xSub = Math.max(0, x - radius);
+      const ia = (y * w + xAdd) * 4;
+      const is = (y * w + xSub) * 4;
+      r += img.data[ia] - img.data[is];
+      g += img.data[ia + 1] - img.data[is + 1];
+      b += img.data[ia + 2] - img.data[is + 2];
+    }
+  }
+  // passe verticale
+  for (let x = 0; x < w; x++) {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let y = -radius; y <= radius; y++) {
+      const cy = Math.max(0, Math.min(h - 1, y));
+      const i = (cy * w + x) * 3;
+      r += tmp[i];
+      g += tmp[i + 1];
+      b += tmp[i + 2];
+    }
+    for (let y = 0; y < h; y++) {
+      const o = (y * w + x) * 4;
+      out[o] = r / norm;
+      out[o + 1] = g / norm;
+      out[o + 2] = b / norm;
+      out[o + 3] = 255;
+      const yAdd = Math.min(h - 1, y + radius + 1);
+      const ySub = Math.max(0, y - radius);
+      const ia = (yAdd * w + x) * 3;
+      const is = (ySub * w + x) * 3;
+      r += tmp[ia] - tmp[is];
+      g += tmp[ia + 1] - tmp[is + 1];
+      b += tmp[ia + 2] - tmp[is + 2];
+    }
+  }
+  return { width: w, height: h, data: out };
+}
+
+/**
+ * Sélection du sujet parmi les composantes 4-connexes :
+ * score = taille × proximité du centre × pénalité de bordure.
+ * Une nappe de fond contrastée (tapis, ombre) est grande mais excentrée et
+ * accrochée à la bordure ; le sujet photographié est cadré au centre.
+ */
+function selectSubjectComponent(mask: Uint8Array, w: number, h: number): Uint8Array {
   const labels = new Int32Array(w * h).fill(-1);
   const queue = new Int32Array(w * h);
-  let bestLabel = -1;
-  let bestSize = 0;
-  let label = 0;
+  interface Comp {
+    size: number;
+    sumX: number;
+    sumY: number;
+    touchesBorder: boolean;
+  }
+  const comps: Comp[] = [];
   for (let start = 0; start < w * h; start++) {
     if (!mask[start] || labels[start] !== -1) continue;
+    const label = comps.length;
+    const comp: Comp = { size: 0, sumX: 0, sumY: 0, touchesBorder: false };
     let head = 0;
     let tail = 0;
     queue[tail++] = start;
     labels[start] = label;
-    let size = 0;
     while (head < tail) {
       const i = queue[head++];
-      size++;
       const x = i % w;
       const y = (i / w) | 0;
+      comp.size++;
+      comp.sumX += x;
+      comp.sumY += y;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) comp.touchesBorder = true;
       const tryPush = (j: number) => {
         if (mask[j] && labels[j] === -1) {
           labels[j] = label;
@@ -183,16 +262,29 @@ function keepLargestComponent(mask: Uint8Array, w: number, h: number): Uint8Arra
       if (y > 0) tryPush(i - w);
       if (y < h - 1) tryPush(i + w);
     }
-    if (size > bestSize) {
-      bestSize = size;
-      bestLabel = label;
+    comps.push(comp);
+  }
+  if (comps.length === 0) return new Uint8Array(w * h);
+
+  const cx = w / 2;
+  const cy = h / 2;
+  const sigma = 0.45 * Math.min(w, h);
+  let best = 0;
+  let bestScore = -1;
+  comps.forEach((c, i) => {
+    const mx = c.sumX / c.size;
+    const my = c.sumY / c.size;
+    const d2 = (mx - cx) * (mx - cx) + (my - cy) * (my - cy);
+    const centerWeight = Math.exp(-d2 / (sigma * sigma));
+    const borderPenalty = c.touchesBorder ? 0.25 : 1;
+    const score = c.size * centerWeight * borderPenalty;
+    if (score > bestScore) {
+      bestScore = score;
+      best = i;
     }
-    label++;
-  }
+  });
   const out = new Uint8Array(w * h);
-  if (bestLabel >= 0) {
-    for (let i = 0; i < w * h; i++) out[i] = labels[i] === bestLabel ? 1 : 0;
-  }
+  for (let i = 0; i < w * h; i++) out[i] = labels[i] === best ? 1 : 0;
   return out;
 }
 
@@ -201,7 +293,12 @@ export class SimpleSegmenter implements Segmenter {
 
   async segment(image: RasterImage): Promise<SegmentationResult> {
     const img = resizeRaster(image, this.workingMaxDim);
-    const { width: w, height: h, data } = img;
+    const { width: w, height: h } = img;
+
+    // 0. Flou anti-texture : la carte de distance se calcule sur une version
+    //    lissée — un tapis/tissu redevient ~uni, le sujet garde son contraste.
+    const blurred = boxBlurRgb(img, Math.max(2, Math.round(Math.min(w, h) / 130)));
+    const data = blurred.data;
 
     // 1. Couleurs de fond : anneau de bordure de 2px.
     const border: number[][] = [];
@@ -315,8 +412,8 @@ export class SimpleSegmenter implements Segmenter {
     mask = dilate(erode(mask, w, h), w, h);
     mask = erode(dilate(mask, w, h), w, h);
 
-    // 6. Sujet principal uniquement.
-    mask = keepLargestComponent(mask, w, h);
+    // 6. Sujet principal : composante centrée plutôt que la plus grosse.
+    mask = selectSubjectComponent(mask, w, h);
 
     let count = 0;
     for (let i = 0; i < w * h; i++) count += mask[i];

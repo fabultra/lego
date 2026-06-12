@@ -5,6 +5,87 @@ import type { RasterImage } from '../types';
  * clair légèrement bruité — multi-couleurs, forme organique, fond réaliste.
  * Permet de tester tout le pipeline sans décodeur JPEG/PNG.
  */
+/**
+ * Cas adversarial reproduit d'une vraie photo utilisateur : mug sauge (faible
+ * contraste) posé sur un tapis gris fortement texturé. Le segmenteur naïf
+ * prenait les taches du tapis pour l'objet. Retourne aussi la vérité terrain.
+ */
+export function makeCarpetMugImage(
+  width = 288,
+  height = 384,
+): { image: RasterImage; truth: Uint8Array } {
+  const data = new Uint8ClampedArray(width * height * 4);
+  const truth = new Uint8Array(width * height);
+
+  let seed = 4242;
+  const rand = () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  // Texture du tapis : bruit basse fréquence (nappes claires/sombres) +
+  // grain fin par pixel — c'est ce qui piégeait le seuillage.
+  const cell = 24;
+  const gw = Math.ceil(width / cell) + 1;
+  const gh = Math.ceil(height / cell) + 1;
+  const lowFreq = new Float32Array(gw * gh);
+  for (let i = 0; i < lowFreq.length; i++) lowFreq[i] = (rand() - 0.5) * 2;
+  const lowAt = (x: number, y: number) => {
+    const gx = x / cell;
+    const gy = y / cell;
+    const x0 = Math.floor(gx);
+    const y0 = Math.floor(gy);
+    const fx = gx - x0;
+    const fy = gy - y0;
+    const v00 = lowFreq[y0 * gw + x0];
+    const v10 = lowFreq[y0 * gw + Math.min(gw - 1, x0 + 1)];
+    const v01 = lowFreq[Math.min(gh - 1, y0 + 1) * gw + x0];
+    const v11 = lowFreq[Math.min(gh - 1, y0 + 1) * gw + Math.min(gw - 1, x0 + 1)];
+    return (v00 * (1 - fx) + v10 * fx) * (1 - fy) + (v01 * (1 - fx) + v11 * fx) * fy;
+  };
+
+  const set = (x: number, y: number, r: number, g: number, b: number, isSubject: boolean) => {
+    const i = (y * width + x) * 4;
+    data[i] = Math.max(0, Math.min(255, r));
+    data[i + 1] = Math.max(0, Math.min(255, g));
+    data[i + 2] = Math.max(0, Math.min(255, b));
+    data[i + 3] = 255;
+    if (isSubject) truth[y * width + x] = 1;
+  };
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const base = 168 + lowAt(x, y) * 18 + (rand() - 0.5) * 38;
+      set(x, y, base, base, base + 2, false);
+    }
+  }
+
+  // Mug : corps cylindrique sauge + couvercle vert foncé, centré.
+  const cx = width / 2;
+  const bodyHalf = width * 0.14;
+  const bodyTop = height * 0.40;
+  const bodyBottom = height * 0.78;
+  const lidTop = height * 0.30;
+  for (let y = Math.round(lidTop); y < bodyBottom; y++) {
+    const isLid = y < bodyTop;
+    const half = isLid ? bodyHalf * 1.12 : bodyHalf;
+    for (let x = Math.round(cx - half); x <= cx + half; x++) {
+      if (x < 0 || x >= width) continue;
+      // léger ombrage cylindrique
+      const t = Math.abs(x - cx) / half;
+      const shade = 1 - 0.18 * t * t;
+      const n = (rand() - 0.5) * 6;
+      if (isLid) set(x, y, 24 * shade + n, 110 * shade + n, 58 * shade + n, true);
+      else set(x, y, 152 * shade + n, 158 * shade + n, 142 * shade + n, true);
+    }
+  }
+
+  return { image: { width, height, data }, truth };
+}
+
 export function makeMushroomImage(width = 240, height = 300): RasterImage {
   const data = new Uint8ClampedArray(width * height * 4);
 
