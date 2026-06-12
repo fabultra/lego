@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -54,12 +54,12 @@ export default function ResultScreen() {
     try {
       const content = await api.exportFile(kind, id, kind === 'bricklink' && useInventory);
       const ext = kind === 'bricklink' ? 'xml' : 'ldr';
-      const uri = `${FileSystem.cacheDirectory}brickify-${id.slice(0, 8)}.${ext}`;
-      await FileSystem.writeAsStringAsync(uri, content);
+      const file = new File(Paths.cache, `brickify-${id.slice(0, 8)}.${ext}`);
+      file.write(content);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
+        await Sharing.shareAsync(file.uri);
       } else {
-        Alert.alert('Export prêt', `Fichier écrit : ${uri}`);
+        Alert.alert('Export prêt', `Fichier écrit : ${file.uri}`);
       }
     } catch (e) {
       showError(e);
