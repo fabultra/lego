@@ -89,8 +89,16 @@ On ne reconstruit pas la 3D ; on extrude intelligemment :
   biscuits découpés.
 - **`paliers`** (sculpture) : `rounded` quantifié par pas de 2 tenons.
 
+**Relief mesuré (V2, en place).** Quand une carte de profondeur monoculaire est
+disponible (`PipelineOptions.depthImage`), le mode `rounded` suit le relief
+**réel** au lieu du profil elliptique : l'épaisseur est normalisée entre les
+percentiles 5–95 de l'objet (un nez ressort, un creux rentre). Cette carte est
+produite côté API par **Depth Anything V2 (Small)** exécuté **localement** dans
+le worker (ONNX/CPU) — relief sur 100 % des générations, sans cold start ni coût
+par photo ; repli automatique sur le profil elliptique si l'inférence échoue.
+Voir `apps/api/src/ml/depthOnnx.ts` et `docs/DEPLOY_RAILWAY.md`.
+
 ```
-V2 : profondeur monoculaire (Depth Anything/MiDaS) -> carte de relief réel avant/arrière.
 V3 : multi-photos (visual hull) puis splatting/photogrammétrie. Même sortie DepthMap.
 ```
 
