@@ -271,7 +271,10 @@ export function Brick3DView({ model, maxStep, width, height }: Props) {
 
   return (
     <View style={{ width, height }}>
-      <Canvas camera={{ fov: 45, near: 0.1, far: 1000, position: [0, 0, scene.boundingRadius * 3] }}>
+      <Canvas
+        dpr={[1, 1.5]}
+        camera={{ fov: 45, near: 0.1, far: 1000, position: [0, 0, scene.boundingRadius * 3] }}
+      >
         <color attach="background" args={[BG_COLOR]} />
         <ambientLight intensity={0.75} />
         <hemisphereLight args={['#ffffff', '#b8b2a6', 0.5]} />

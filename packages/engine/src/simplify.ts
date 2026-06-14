@@ -236,6 +236,34 @@ export function enforceSupport(g: VoxelGrid): { removed: number; samples: { x: n
   return { removed, samples };
 }
 
+/**
+ * Tasse le modèle sur le sol : décale toute la grille vers le bas pour que la
+ * couche occupée la plus basse devienne z=0.
+ *
+ * Indispensable avant `enforceSupport` : si l'objet « flotte » au-dessus de
+ * z=0 (fréquent quand le bas de la silhouette est arrondi/pointu et que la
+ * couverture des cellules du bas passe sous le seuil), la règle de support
+ * raboterait TOUT en cascade (couche z=1 non soutenue par un z=0 vide, puis
+ * z=2 par un z=1 désormais vide, etc.) — d'où des modèles à 0 pièce.
+ * Retourne le nombre de couches vides supprimées sous le modèle.
+ */
+export function settleToGround(g: VoxelGrid): number {
+  let minZ = -1;
+  for (let z = 0; z < g.sz && minZ < 0; z++) {
+    for (let i = 0; i < g.sx * g.sy; i++) {
+      if (g.data[z * g.sx * g.sy + i] >= 0) {
+        minZ = z;
+        break;
+      }
+    }
+  }
+  if (minZ <= 0) return Math.max(0, minZ);
+  const layer = g.sx * g.sy;
+  g.data.copyWithin(0, minZ * layer);
+  g.data.fill(-1, (g.sz - minZ) * layer);
+  return minZ;
+}
+
 /** Aire (en cellules) de la couche z. */
 function layerArea(g: VoxelGrid, z: number): number {
   let a = 0;
@@ -293,6 +321,7 @@ export function simplifyGrid(g: VoxelGrid, opts: SimplifyOptions): SimplifyResul
 
   const removedIslands = removeSmallIslands(g, opts.minIslandVoxels);
   const filledHoles = fillInternalHoles(g);
+  settleToGround(g); // l'objet doit reposer sur le sol avant la règle de support
   const support = enforceSupport(g);
   // enforceSupport peut isoler des fragments -> seconde passe d'îlots.
   const removedIslands2 = removeSmallIslands(g, opts.minIslandVoxels);
