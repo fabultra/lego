@@ -50,6 +50,26 @@ Notes :
 Clic droit sur le service → **Attach Volume** → mount path : **`/data`**.
 (Photos, masques et grilles JSON y survivent aux redéploiements.)
 
+## 4 bis. Relief 3D local (profondeur) — recommandé
+
+Le relief volumique est calculé **localement dans le worker** par Depth
+Anything V2 (Small), export ONNX, exécuté sur CPU. Avantages vs Replicate :
+relief réel sur **100 %** des générations, **aucun cold start**, **zéro coût
+par photo**. Activé par défaut (`DEPTH_LOCAL_ENABLED=true`) — rien à régler.
+
+- À la **première génération**, le worker télécharge le modèle (~99 Mo) puis le
+  met en cache sous `STORAGE_LOCAL_DIR/models` (donc `/data/storage/models`,
+  sur le volume) : un seul téléchargement, conservé entre redéploiements.
+- En cas d'échec (réseau, mémoire, runtime), repli **silencieux** sur le profil
+  elliptique du moteur : une génération n'est jamais bloquée par le relief.
+- **Mémoire** : le modèle fp32 + ONNX Runtime ajoutent ~200–300 Mo de RAM. Sur
+  un petit plan, pointer vers la variante quantifiée (~25 Mo, plus légère) :
+  ```
+  DEPTH_ONNX_MODEL_URL=https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model_quantized.onnx
+  ```
+- Si le relief sort inversé (creux et bosses échangés) : `DEPTH_ONNX_INVERT=true`.
+- Pour désactiver et revenir à Replicate / profil elliptique : `DEPTH_LOCAL_ENABLED=false`.
+
 ## 5. Domaine public
 
 Service → **Settings** → **Networking** → **Generate Domain**.
@@ -113,3 +133,4 @@ partageable). Pour scaler :
 | Images 404 après redéploiement | volume non attaché ou `STORAGE_LOCAL_DIR` ≠ chemin monté |
 | URLs d'images en `http://localhost:8080/...` | service démarré avant la création du domaine — définir `PUBLIC_BASE_URL` puis redéployer |
 | L'app mobile ne voit pas l'API | `EXPO_PUBLIC_API_URL` manquant (relancer `expo start` après changement) |
+| Relief plat malgré un style volumique | log `relief local ONNX appliqué` absent : modèle non téléchargé (réseau) ou mémoire insuffisante → essayer `DEPTH_ONNX_MODEL_URL=…model_quantized.onnx` ; repli profil elliptique entre-temps |

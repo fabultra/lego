@@ -1,15 +1,40 @@
 import type { GrayImage } from '@brickify/engine';
 import sharp from 'sharp';
 import { config } from '../config';
+import { getDepthImageLocal } from './depthOnnx';
 import { fetchOutputBuffer, runReplicate } from './replicate';
 
 /**
- * Profondeur monoculaire via Replicate (Depth Anything v2) : retourne une
- * carte de gris alignée sur l'image source (255 = proche caméra), ou null si
- * l'API est indisponible — le pipeline retombe alors sur son profil
- * elliptique. Ne jamais bloquer une génération pour du relief.
+ * Profondeur monoculaire pour le relief volumique. Stratégie en cascade,
+ * jamais bloquante (un échec retombe sur le profil elliptique du moteur) :
+ *
+ *   1. LOCALE  — Depth Anything V2 ONNX dans le worker (par défaut). Relief
+ *      réel sur 100% des générations, zéro cold start, zéro coût par photo.
+ *   2. Replicate — Depth Anything v2 hébergé, si un token est configuré.
+ *      Repli historique : utile sans le modèle local, mais sujet aux cold
+ *      starts GPU.
+ *   3. null — aucun relief mesuré : le moteur utilise son profil elliptique.
  */
 export async function getDepthImage(
+  normalizedJpeg: Buffer,
+  width: number,
+  height: number,
+): Promise<GrayImage | null> {
+  if (config.depth.localEnabled) {
+    const local = await getDepthImageLocal(normalizedJpeg, width, height);
+    if (local) return local;
+  }
+  if (config.replicate.token) {
+    return getDepthImageReplicate(normalizedJpeg, width, height);
+  }
+  return null;
+}
+
+/**
+ * Profondeur via Replicate (Depth Anything v2) : carte de gris alignée sur
+ * l'image source (255 = proche caméra), ou null si l'API est indisponible.
+ */
+export async function getDepthImageReplicate(
   normalizedJpeg: Buffer,
   width: number,
   height: number,
@@ -37,6 +62,7 @@ export async function getDepthImage(
       .toBuffer({ resolveWithObject: true });
     const gray = new Uint8Array(width * height);
     for (let i = 0; i < gray.length; i++) gray[i] = data[i * info.channels];
+    console.log('[ml] relief Replicate appliqué (depth-anything-v2)');
     return { width, height, data: gray };
   } catch (e) {
     console.warn('[ml] profondeur Replicate indisponible, profil elliptique :', e instanceof Error ? e.message : e);

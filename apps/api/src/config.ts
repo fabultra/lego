@@ -61,6 +61,28 @@ export const config = {
      */
     depthTimeoutMs: parseInt(env('REPLICATE_DEPTH_TIMEOUT_MS', '25000'), 10),
   },
+  /**
+   * Profondeur LOCALE dans le worker (Depth Anything V2 Small, ONNX, CPU) :
+   * relief réel sur 100% des générations sans cold start ni coût par photo.
+   * Activée par défaut ; le modèle est téléchargé une fois puis mis en cache
+   * sur le disque (volume persistant en prod). Désactivable via
+   * DEPTH_LOCAL_ENABLED=false (repli Replicate ou profil elliptique).
+   */
+  depth: {
+    localEnabled: env('DEPTH_LOCAL_ENABLED', 'true') === 'true',
+    onnxModelUrl: env(
+      'DEPTH_ONNX_MODEL_URL',
+      'https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model.onnx',
+    ),
+    /** Chemin d'un modèle pré-embarqué : court-circuite le téléchargement. */
+    onnxModelPath: process.env.DEPTH_ONNX_MODEL_PATH,
+    /** Répertoire de cache du modèle (par défaut sous le stockage local). */
+    modelDir: env('DEPTH_MODEL_DIR', `${env('STORAGE_LOCAL_DIR', './storage')}/models`),
+    /** Côté de l'entrée du réseau (multiple de 14 pour le ViT). */
+    inputSize: parseInt(env('DEPTH_ONNX_INPUT_SIZE', '518'), 10),
+    /** true si le modèle renvoie une distance (grand = loin) au lieu d'une disparité. */
+    invert: env('DEPTH_ONNX_INVERT', 'false') === 'true',
+  },
   limits: {
     maxUploadBytes: 12 * 1024 * 1024,
     /** côté long max de l'image source conservée. */
