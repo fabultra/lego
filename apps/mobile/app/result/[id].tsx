@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../../src/api/client';
 import { IsoBrickView } from '../../src/components/IsoBrickView';
+import { ModelViewer } from '../../src/components/ModelViewer';
 import { LayerPlan } from '../../src/components/LayerPlan';
 import type { GeneratedModelDTO, InstructionsDTO, PiecesResponseDTO } from '../../src/types';
 
@@ -106,8 +107,8 @@ export default function ResultScreen() {
         <ScrollView contentContainerClassName="px-6 pb-10">
           {tab === 'model' && (
             <View>
-              <View className="bg-white rounded-2xl p-2 items-center border border-gray-100">
-                <IsoBrickView model={model} width={viewW} height={viewW * 0.95} />
+              <View className="bg-white rounded-2xl p-2 items-center border border-gray-100 overflow-hidden">
+                <ModelViewer model={model} width={viewW} height={viewW * 0.95} />
               </View>
               <View className="flex-row gap-2 mt-3">
                 <Stat label="Pièces" value={String(model.pieceCount)} />
