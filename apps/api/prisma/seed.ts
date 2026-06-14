@@ -1,6 +1,8 @@
 /**
- * Seed du catalogue : pièces autorisées + couleurs LEGO, copiés depuis le
- * moteur (source de vérité unique : @brickify/engine).
+ * Seed minimal (exécuté à chaque boot, idempotent) : les 12 pièces générables
+ * + les 25 couleurs de la palette moteur, copiées depuis @brickify/engine
+ * (source de vérité unique). Le catalogue complet (50k pièces, 270 couleurs,
+ * inventaires de sets) est importé séparément par le job import-rebrickable.
  */
 import { PrismaClient } from '@prisma/client';
 import { LEGO_PALETTE, PARTS } from '@brickify/engine';
@@ -19,21 +21,27 @@ async function main() {
         heightPlates: part.heightPlates,
         kind: part.kind,
         avgPriceCents: part.avgPriceCents,
+        isBuildable: true,
       },
       update: {
         name: part.name,
+        widthStuds: part.widthStuds,
+        depthStuds: part.depthStuds,
+        heightPlates: part.heightPlates,
+        kind: part.kind,
         avgPriceCents: part.avgPriceCents,
+        isBuildable: true,
       },
     });
   }
   for (const color of LEGO_PALETTE) {
     await prisma.legoColor.upsert({
       where: { id: color.id },
-      create: { id: color.id, name: color.name, hex: color.hex },
-      update: { name: color.name, hex: color.hex },
+      create: { id: color.id, name: color.name, hex: color.hex, blId: color.blId },
+      update: { name: color.name, hex: color.hex, blId: color.blId },
     });
   }
-  console.log(`Seed OK : ${Object.keys(PARTS).length} pièces, ${LEGO_PALETTE.length} couleurs.`);
+  console.log(`Seed OK : ${Object.keys(PARTS).length} pièces générables, ${LEGO_PALETTE.length} couleurs.`);
 }
 
 main()

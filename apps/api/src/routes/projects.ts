@@ -1,4 +1,4 @@
-import { SimpleSegmenter } from '@brickify/engine';
+import { segmentSmart } from '../ml/segmenter';
 import type {
   BuildStepDTO,
   GeneratedModelDTO,
@@ -124,8 +124,9 @@ projectsRouter.post(
     }
 
     const decoded = await decodeUpload(req.file.buffer);
-    const seg = await new SimpleSegmenter().segment(decoded.raster);
+    const seg = await segmentSmart(decoded.raster, decoded.normalizedJpeg);
     const maskPng = await maskToPng(seg.mask);
+    console.log(`[upload] segmentation ${seg.engine} — couverture ${(seg.coverage * 100).toFixed(1)}%`);
 
     const sourceKey = storageKeys.source(project.id);
     const maskKey = storageKeys.maskAuto(project.id);

@@ -1,4 +1,4 @@
-import { BRICK_HEIGHT_RATIO, type Mask, type RasterImage, type Silhouette } from './types';
+import { BRICK_HEIGHT_RATIO, type GrayImage, type Mask, type RasterImage, type Silhouette } from './types';
 
 /** Boîte englobante du masque, avec une petite marge. */
 export function maskBounds(mask: Mask): { x0: number; y0: number; x1: number; y1: number } | null {
@@ -34,6 +34,8 @@ export function buildSilhouette(
   mask: Mask,
   targetStudsWidth: number,
   coverageThreshold: number,
+  /** Carte de profondeur alignée sur l'image (255 = proche), optionnelle. */
+  depthImage?: GrayImage,
 ): Silhouette | null {
   if (image.width !== mask.width || image.height !== mask.height) {
     throw new Error('image et masque doivent avoir les mêmes dimensions');
@@ -51,6 +53,10 @@ export function buildSilhouette(
 
   const occupancy = new Uint8Array(sx * sz);
   const colors = new Uint8ClampedArray(sx * sz * 3);
+  const depth = depthImage ? new Float32Array(sx * sz) : undefined;
+  if (depthImage && (depthImage.width !== image.width || depthImage.height !== image.height)) {
+    throw new Error('carte de profondeur et image doivent avoir les mêmes dimensions');
+  }
 
   for (let cz = 0; cz < sz; cz++) {
     // z=0 -> bas de la boîte englobante
@@ -65,6 +71,7 @@ export function buildSilhouette(
       let r = 0;
       let g = 0;
       let b = 0;
+      let dSum = 0;
       const yA = Math.max(0, Math.floor(pyStart));
       const yB = Math.min(image.height - 1, Math.ceil(pyEnd) - 1);
       const xA = Math.max(0, Math.floor(pxStart));
@@ -79,6 +86,7 @@ export function buildSilhouette(
             r += image.data[ii];
             g += image.data[ii + 1];
             b += image.data[ii + 2];
+            if (depthImage) dSum += depthImage.data[mi];
           }
         }
       }
@@ -88,11 +96,12 @@ export function buildSilhouette(
         colors[ci * 3] = Math.round(r / inside);
         colors[ci * 3 + 1] = Math.round(g / inside);
         colors[ci * 3 + 2] = Math.round(b / inside);
+        if (depth) depth[ci] = dSum / inside;
       }
     }
   }
 
-  return { sx, sz, occupancy, colors };
+  return { sx, sz, occupancy, colors, depth };
 }
 
 /**
@@ -118,8 +127,10 @@ export function tidySilhouette(s: Silhouette, iterations: number): Silhouette {
     }
     occ = next;
   }
-  // Couleur des cellules comblées : moyenne des voisines occupées d'origine.
+  // Couleur (et profondeur) des cellules comblées : moyenne des voisines
+  // occupées d'origine.
   const colors = new Uint8ClampedArray(s.colors);
+  const depth = s.depth ? new Float32Array(s.depth) : undefined;
   for (let z = 0; z < sz; z++) {
     for (let x = 0; x < sx; x++) {
       const i = z * sx + x;
@@ -127,12 +138,14 @@ export function tidySilhouette(s: Silhouette, iterations: number): Silhouette {
         let r = 0;
         let g = 0;
         let b = 0;
+        let d = 0;
         let n = 0;
         const take = (j: number) => {
           if (s.occupancy[j]) {
             r += s.colors[j * 3];
             g += s.colors[j * 3 + 1];
             b += s.colors[j * 3 + 2];
+            if (s.depth) d += s.depth[j];
             n++;
           }
         };
@@ -144,9 +157,10 @@ export function tidySilhouette(s: Silhouette, iterations: number): Silhouette {
           colors[i * 3] = Math.round(r / n);
           colors[i * 3 + 1] = Math.round(g / n);
           colors[i * 3 + 2] = Math.round(b / n);
+          if (depth) depth[i] = d / n;
         }
       }
     }
   }
-  return { sx, sz, occupancy: occ, colors };
+  return { sx, sz, occupancy: occ, colors, depth };
 }

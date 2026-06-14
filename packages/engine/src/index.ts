@@ -34,5 +34,5 @@ export { validateStructure, type StabilityResult } from './stability';
 export { generateInstructions } from './instructions';
 export { buildBom, bomTotalCents, PRICE_DISCLAIMER } from './bom';
 export { runPipeline, resolveParams, EngineError } from './pipeline';
-// Fixture de dev/test (image synthétique, aucun décodeur requis) :
-export { makeMushroomImage } from './demo/sampleImage';
+// Fixtures de dev/test (images synthétiques, aucun décodeur requis) :
+export { makeMushroomImage, makeCarpetMugImage } from './demo/sampleImage';

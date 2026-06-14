@@ -123,11 +123,15 @@ export async function runPipeline(
 
   // --- 2. Silhouette sur la grille LEGO ------------------------------------
   report('silhouette', 18);
-  let silhouette = buildSilhouette(workImg, seg.mask, params.targetStudsWidth, params.coverageThreshold);
+  // Carte de profondeur ML éventuelle, réalignée sur l'image de travail.
+  const workDepth = options.depthImage
+    ? resizeGray(options.depthImage, workImg.width, workImg.height)
+    : undefined;
+  let silhouette = buildSilhouette(workImg, seg.mask, params.targetStudsWidth, params.coverageThreshold, workDepth);
   if (!silhouette) throw new EngineError('EMPTY_SILHOUETTE', 'Silhouette vide après échantillonnage.');
   if (silhouette.sz > MAX_LAYERS) {
     const reducedWidth = Math.max(6, Math.floor((params.targetStudsWidth * MAX_LAYERS) / silhouette.sz));
-    silhouette = buildSilhouette(workImg, seg.mask, reducedWidth, params.coverageThreshold);
+    silhouette = buildSilhouette(workImg, seg.mask, reducedWidth, params.coverageThreshold, workDepth);
     if (!silhouette) throw new EngineError('EMPTY_SILHOUETTE', 'Silhouette vide après échantillonnage.');
   }
   silhouette = tidySilhouette(silhouette, params.smoothIterations);
@@ -230,6 +234,19 @@ function maskCoverage(mask: Mask): number {
   let n = 0;
   for (let i = 0; i < mask.data.length; i++) n += mask.data[i];
   return n / (mask.width * mask.height);
+}
+
+function resizeGray(img: { width: number; height: number; data: Uint8Array }, w: number, h: number): { width: number; height: number; data: Uint8Array } {
+  if (img.width === w && img.height === h) return img;
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const sy = Math.min(img.height - 1, Math.floor((y / h) * img.height));
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(img.width - 1, Math.floor((x / w) * img.width));
+      out[y * w + x] = img.data[sy * img.width + sx];
+    }
+  }
+  return { width: w, height: h, data: out };
 }
 
 function resizeMask(mask: Mask, w: number, h: number): Mask {

@@ -3,6 +3,7 @@ import express from 'express';
 import { resolve } from 'node:path';
 import { config } from './config';
 import { errorHandler } from './errors';
+import { adminRouter } from './routes/admin';
 import { exportsRouter } from './routes/exports';
 import { inventoryRouter } from './routes/inventory';
 import { projectsRouter } from './routes/projects';
@@ -44,6 +45,7 @@ export function createApp(): express.Express {
   app.use('/projects', projectsRouter);
   app.use('/inventory', inventoryRouter);
   app.use('/exports', exportsRouter);
+  app.use('/admin', adminRouter);
 
   app.use(errorHandler);
   return app;

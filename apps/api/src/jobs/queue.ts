@@ -34,3 +34,15 @@ export const generationQueue = new Queue<GenerationJobData>(QUEUE_NAME, {
     removeOnFail: { age: 7 * 24 * 3600 },
   },
 });
+
+/** File de maintenance : tâches longues hors génération (import catalogue…). */
+export const MAINTENANCE_QUEUE_NAME = 'maintenance';
+
+export const maintenanceQueue = new Queue(MAINTENANCE_QUEUE_NAME, {
+  connection: redisConnection(),
+  defaultJobOptions: {
+    attempts: 1,
+    removeOnComplete: { age: 7 * 24 * 3600 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+  },
+});

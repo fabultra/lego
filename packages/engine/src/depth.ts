@@ -73,6 +73,29 @@ export function estimateDepth(
     return { sx, sz, depth };
   }
 
+  // Relief ML : quand la silhouette porte une profondeur mesurée (carte
+  // monoculaire, 255 = proche), l'épaisseur suit le relief réel normalisé
+  // entre les percentiles 5 et 95 de l'objet — un nez ressort, un creux
+  // rentre. Sinon, profil elliptique déduit de la forme (ci-dessous).
+  if (mode === 'rounded' && s.depth) {
+    const values: number[] = [];
+    for (let i = 0; i < sx * sz; i++) if (s.occupancy[i]) values.push(s.depth[i]);
+    values.sort((a, b) => a - b);
+    const p = (q: number) => values[Math.min(values.length - 1, Math.floor(q * values.length))];
+    const lo = p(0.05);
+    const hi = p(0.95);
+    const span = Math.max(1e-3, hi - lo);
+    for (let i = 0; i < sx * sz; i++) {
+      if (!s.occupancy[i]) continue;
+      const rel = Math.max(0, Math.min(1, (s.depth[i] - lo) / span));
+      let dep = Math.round(maxDepth * (0.2 + 0.8 * rel));
+      dep = Math.max(1, Math.min(maxDepth, dep));
+      if (quantizeStep > 1) dep = Math.max(1, Math.round(dep / quantizeStep) * quantizeStep);
+      depth[i] = dep;
+    }
+    return { sx, sz, depth };
+  }
+
   const dt = distanceTransform(s);
   let dtMax = 0;
   for (let i = 0; i < sx * sz; i++) if (dt[i] > dtMax) dtMax = dt[i];

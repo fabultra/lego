@@ -123,28 +123,59 @@ model GeneratedModel {
   steps   BuildStep[]
 }
 
-/// Catalogue des pièces autorisées (seedé depuis @brickify/engine).
+/// Catalogue des pièces : les 12 pièces générables (isBuildable, seedées
+/// depuis @brickify/engine) + l'intégralité du catalogue Rebrickable
+/// (importé par le job import-rebrickable, pour l'inventaire par set).
 model LegoPiece {
-  id            String @id // design id, ex. "3001"
+  id            String  @id // design id / part_num Rebrickable, ex. "3001"
   name          String
-  widthStuds    Int
-  depthStuds    Int
-  heightPlates  Int
-  kind          String // brick | plate | slope
-  avgPriceCents Int
+  widthStuds    Int     @default(0)
+  depthStuds    Int     @default(0)
+  heightPlates  Int     @default(0)
+  kind          String  @default("other") // brick | plate | slope | other
+  avgPriceCents Int     @default(0)
+  /// true : le générateur peut produire cette pièce (dimensions renseignées)
+  isBuildable   Boolean @default(false)
 
   modelPieces     ModelPiece[]
   inventoryPieces InventoryPiece[]
 }
 
-/// Couleurs LEGO (ids BrickLink, seedées depuis @brickify/engine).
+/// Couleurs LEGO — id canonique Rebrickable (== code LDraw pour les
+/// couleurs standards), blId = id BrickLink pour l'export Wanted List.
 model LegoColor {
-  id   Int    @id
-  name String
-  hex  String
+  id      Int     @id
+  name    String
+  hex     String
+  blId    Int?
+  isTrans Boolean @default(false)
 
   modelPieces     ModelPiece[]
   inventoryPieces InventoryPiece[]
+}
+
+/// Sets LEGO (catalogue Rebrickable) — pour l'inventaire par numéro de set.
+model RbSet {
+  setNum   String @id // ex. "10696-1"
+  name     String
+  year     Int
+  numParts Int
+
+  parts RbSetPart[]
+}
+
+/// Contenu d'un set (inventaire Rebrickable agrégé, hors pièces de rechange).
+model RbSetPart {
+  id       String @id @default(uuid())
+  setNum   String
+  partId   String // part_num Rebrickable (présent dans LegoPiece après import)
+  colorId  Int
+  quantity Int
+
+  set RbSet @relation(fields: [setNum], references: [setNum], onDelete: Cascade)
+
+  @@unique([setNum, partId, colorId])
+  @@index([setNum])
 }
 
 /// Une brique placée dans un modèle généré.

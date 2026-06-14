@@ -1,6 +1,7 @@
 import { EngineError, runPipeline, type Mask, type PipelineOptions } from '@brickify/engine';
 import { prisma } from '../db';
 import { decodeUpload, pngToMask } from '../images';
+import { getDepthImage } from '../ml/depth';
 import { toDtoDetail, toDtoSize, toDtoStyle } from '../serializers';
 import { storage, storageKeys } from '../storage';
 
@@ -39,19 +40,35 @@ export async function processGeneration(
     const sourceBuffer = await storage.get(source.storageKey);
     const { raster } = await decodeUpload(sourceBuffer);
 
-    // Masque corrigé par l'utilisateur, s'il existe.
+    // Réutilise le masque de l'écran de confirmation (corrigé > automatique) :
+    // cohérence aperçu/génération garantie, et pas de double appel ML.
     let precomputedMask: Mask | undefined;
-    const edited = project.images.find((i) => i.kind === 'MASK_EDITED');
-    if (edited) {
-      precomputedMask = await pngToMask(await storage.get(edited.storageKey));
+    const maskImage =
+      project.images.find((i) => i.kind === 'MASK_EDITED') ??
+      project.images.find((i) => i.kind === 'MASK_AUTO');
+    if (maskImage) {
+      precomputedMask = await pngToMask(await storage.get(maskImage.storageKey));
+    }
+
+    // Relief réel (profondeur monoculaire) pour les styles volumiques —
+    // jamais bloquant : sans réponse ML, profil elliptique du moteur.
+    const style = toDtoStyle(project.style);
+    let depthImage: PipelineOptions['depthImage'];
+    if (style === 'realistic' || style === 'cartoon') {
+      depthImage = (await getDepthImage(sourceBuffer, raster.width, raster.height)) ?? undefined;
+      if (depthImage) {
+        await reportProgress('depth', 22);
+        console.log('[worker] relief ML appliqué (depth-anything-v2)');
+      }
     }
 
     const options: PipelineOptions = {
       size: toDtoSize(project.size),
       detail: toDtoDetail(project.detail),
-      style: toDtoStyle(project.style),
+      style,
       depthStuds: project.depthStuds ?? undefined,
       precomputedMask,
+      depthImage,
     };
 
     const result = await runPipeline(raster, options, (stage, pct) => {

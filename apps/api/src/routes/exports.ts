@@ -51,6 +51,13 @@ exportsRouter.post(
       }
     }
 
+    // Les couleurs sont stockées en ids Rebrickable ; BrickLink a sa propre
+    // numérotation -> conversion via LegoColor.blId.
+    const colorRows = await prisma.legoColor.findMany({
+      where: { id: { in: [...new Set([...counts.values()].map((l) => l.colorId))] } },
+    });
+    const blByColor = new Map(colorRows.map((c) => [c.id, c.blId]));
+
     const items = [...counts.values()]
       .filter((l) => l.quantity > 0)
       .sort((a, b) => a.partId.localeCompare(b.partId) || a.colorId - b.colorId)
@@ -59,7 +66,7 @@ exportsRouter.post(
           '  <ITEM>\n' +
           '    <ITEMTYPE>P</ITEMTYPE>\n' +
           `    <ITEMID>${l.partId}</ITEMID>\n` +
-          `    <COLOR>${l.colorId}</COLOR>\n` +
+          `    <COLOR>${blByColor.get(l.colorId) ?? l.colorId}</COLOR>\n` +
           `    <MINQTY>${l.quantity}</MINQTY>\n` +
           '    <CONDITION>X</CONDITION>\n' +
           '  </ITEM>',
@@ -84,14 +91,14 @@ exportsRouter.post(
 // Référentiel LDraw : Y vers le BAS, 1 tenon = 20 LDU, brique = 24 LDU,
 // plaque = 8 LDU. Origine des pièces : centre du corps, plan supérieur.
 // NOTE PROD : vérifier l'import dans Studio (origines de pièces + codes
-// couleur) avant publication — table LDRAW_COLOR ci-dessous à auditer.
+// couleur) avant publication.
 exportsRouter.post(
   '/studio',
   asyncHandler<AuthedRequest>(async (req, res) => {
     const body = exportSchema.parse(req.body);
     const { project, model } = await loadModelForExport(body.projectId, req.userId);
 
-    const parts = await prisma.legoPiece.findMany();
+    const parts = await prisma.legoPiece.findMany({ where: { isBuildable: true } });
     const heightByPart = new Map(parts.map((p) => [p.id, p.heightPlates]));
     const dimsByPart = new Map(parts.map((p) => [p.id, { w: p.widthStuds, d: p.depthStuds }]));
 
@@ -118,9 +125,10 @@ exportsRouter.post(
       const cz = (p.y + d / 2) * 20;
       // Y LDraw négatif vers le haut ; origine pièce au plan supérieur.
       const cy = -(layerBottom(p.z) + heightLdu);
-      const color = LDRAW_COLOR[p.colorId] ?? 7;
+      // colorId est l'id Rebrickable, égal au code LDraw pour nos couleurs
+      // standards (audité par le job d'import) -> utilisable directement.
       const m = p.rotated ? '0 0 1 0 1 0 -1 0 0' : '1 0 0 0 1 0 0 0 1';
-      lines.push(`1 ${color} ${cx} ${cy} ${cz} ${m} ${p.pieceId}.dat`);
+      lines.push(`1 ${p.colorId} ${cx} ${cy} ${cz} ${m} ${p.pieceId}.dat`);
     }
     lines.push('0');
 
@@ -145,34 +153,3 @@ function slug(s: string): string {
   );
 }
 
-/**
- * Id couleur BrickLink -> code couleur LDraw.
- * À auditer contre ldraw.org/article/547 avant production.
- */
-const LDRAW_COLOR: Record<number, number> = {
-  1: 15, // White
-  86: 71, // Light Bluish Gray
-  85: 72, // Dark Bluish Gray
-  11: 0, // Black
-  5: 4, // Red
-  59: 320, // Dark Red
-  4: 25, // Orange
-  110: 191, // Bright Light Orange
-  3: 14, // Yellow
-  103: 226, // Bright Light Yellow
-  34: 27, // Lime
-  36: 10, // Bright Green
-  6: 2, // Green
-  80: 288, // Dark Green
-  156: 322, // Medium Azure
-  42: 73, // Medium Blue
-  7: 1, // Blue
-  63: 272, // Dark Blue
-  24: 22, // Purple
-  47: 5, // Dark Pink
-  104: 29, // Bright Pink
-  2: 19, // Tan
-  69: 28, // Dark Tan
-  88: 70, // Reddish Brown
-  120: 308, // Dark Brown
-};
