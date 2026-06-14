@@ -5,5 +5,8 @@ module.exports = function (api) {
       ['babel-preset-expo', { jsxImportSource: 'nativewind' }],
       'nativewind/babel',
     ],
+    // three.js (>=0.160) utilise les « static class blocks » ; Metro doit les
+    // transformer pour Hermes.
+    plugins: ['@babel/plugin-transform-class-static-block'],
   };
 };
