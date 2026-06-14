@@ -9,6 +9,31 @@ function emptyGrid(sx: number, sy: number, sz: number): VoxelGrid {
   return { sx, sy, sz, data: new Int16Array(sx * sy * sz).fill(-1) };
 }
 
+test("settle : un objet flottant au-dessus du sol n'est pas raboté en cascade (régression 0 pièce)", () => {
+  // masse pleine occupant z=2..4 seulement (rien en z=0/z=1) — comme une
+  // silhouette dont le bas est passé sous le seuil de couverture.
+  const g = emptyGrid(6, 4, 6);
+  for (let z = 2; z <= 4; z++) {
+    for (let y = 0; y < 4; y++) {
+      for (let x = 0; x < 6; x++) g.data[gridIndex(g, x, y, z)] = 0;
+    }
+  }
+  const before = g.data.reduce((n, v) => n + (v >= 0 ? 1 : 0), 0);
+  const res = simplifyGrid(g, { minIslandVoxels: 1, addBase: 'never', baseColorIndex: () => 0 });
+  const after = res.grid.data.reduce((n, v) => n + (v >= 0 ? 1 : 0), 0);
+  assert.equal(after, before, 'aucun voxel ne doit être perdu : le bloc repose désormais sur le sol');
+  // la masse a bien été tassée en z=0..2
+  let lowest = 99;
+  for (let z = 0; z < res.grid.sz; z++) {
+    for (let i = 0; i < res.grid.sx * res.grid.sy; i++) {
+      if (res.grid.data[z * res.grid.sx * res.grid.sy + i] >= 0) {
+        lowest = Math.min(lowest, z);
+      }
+    }
+  }
+  assert.equal(lowest, 0, 'la couche la plus basse doit être z=0 après tassement');
+});
+
 test('enforceSupport supprime les voxels flottants et garde les petits surplombs', () => {
   const g = emptyGrid(6, 3, 3);
   // colonne supportée en (1,1)

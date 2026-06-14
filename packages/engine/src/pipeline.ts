@@ -33,7 +33,7 @@ const SIZE_TO_STUDS = { small: 16, medium: 28, large: 44 } as const;
 
 export class EngineError extends Error {
   constructor(
-    public readonly code: 'OBJECT_NOT_FOUND' | 'EMPTY_SILHOUETTE',
+    public readonly code: 'OBJECT_NOT_FOUND' | 'EMPTY_SILHOUETTE' | 'EMPTY_MODEL',
     message: string,
   ) {
     super(message);
@@ -184,6 +184,16 @@ export async function runPipeline(
         'la forme a été légèrement creusée pour rester constructible.',
     });
     stabilityScore = Math.max(0, stabilityScore - Math.min(0.2, carvedFloatingBricks * 0.004));
+  }
+
+  // Garde-fou : un modèle vide (objet plat/fin/mal détouré dont tout a été
+  // raboté) ne doit pas produire un résultat « 0 pièce » déroutant — on
+  // échoue proprement avec un message exploitable côté UX.
+  if (stability.bricks.length === 0) {
+    throw new EngineError(
+      'EMPTY_MODEL',
+      "Le modèle obtenu est vide (objet trop plat ou mal détouré). Reprenez la photo en cadrant l'objet entier, debout, sur un fond uni.",
+    );
   }
 
   // --- 9. Instructions + nomenclature ---------------------------------------
